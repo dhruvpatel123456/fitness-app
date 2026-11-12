@@ -1,5 +1,5 @@
 // Service worker: caches the app shell so it opens offline.
-const CACHE = 'fittrack-v2';
+const CACHE = 'fittrack-v3';
 const ASSETS = ['./', 'index.html', 'styles.css', 'app.js', 'foods.js', 'vendor/html5-qrcode.min.js',
   'manifest.webmanifest', 'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png'];
 
