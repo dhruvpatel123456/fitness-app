@@ -175,3 +175,25 @@ export function nutritionProblems(per100) {
   }
   return problems;
 }
+
+/**
+ * The serving used when a food is added with one tap: whatever was used last
+ * time, otherwise its first named serving, otherwise 100 g / 100 mL.
+ */
+export function defaultServing(food) {
+  if (food.last && food.last.amount > 0 && food.last.quantity > 0) {
+    return { label: food.last.label, amount: food.last.amount, quantity: food.last.quantity };
+  }
+  const first = (food.servings || []).find((s) => s && s.amount > 0 && s.label);
+  if (first) return { label: first.label, amount: first.amount, quantity: 1 };
+  return { label: `100 ${baseUnitLabel(food.base_unit)}`, amount: 100, quantity: 1 };
+}
+
+/** "2 × 1 slice (30 g)" / "150 g" style description of an amount. */
+export function describeServing(unitLabel, unitAmount, quantity, baseUnit) {
+  const u = baseUnitLabel(baseUnit);
+  const q = Math.round(quantity * 100) / 100;
+  if (unitAmount === 1) return `${q} ${u}`;
+  if (unitAmount === 100 && unitLabel === `100 ${u}`) return `${Math.round(quantity * 100 * 100) / 100} ${u}`;
+  return q === 1 ? unitLabel : `${q} × ${unitLabel}`;
+}
