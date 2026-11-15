@@ -1,2 +1,16 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Your data stays on your laptop: never commit it
+data/
+backups/
+.env
+certs/
+
+# Editor and OS files
 .DS_Store
+Thumbs.db
 *.log
+.vscode/
+.idea/
