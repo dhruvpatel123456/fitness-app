@@ -64,6 +64,12 @@ function assert(cond, message) {
 /** The big "Add to <meal>" button on a food's detail screen (not "Add to favourites"). */
 const ADD_TO_MEAL = /^Add to (Breakfast|Lunch|Dinner|Snacks)$/;
 
+/** Screenshot after letting slide-in animations settle. */
+async function snap(page, file) {
+  await page.waitForTimeout(450);
+  await page.screenshot({ path: path.join(SHOTS, file) });
+}
+
 const near = (a, b, tol = 1.01) => Math.abs(a - b) <= tol;
 
 /** The screen on top (a page or sheet), or the whole page when only the tabs are showing. */
@@ -104,7 +110,10 @@ async function main() {
   const ctx = await browser.newContext({ ...phone, permissions: ['camera'] });
   const page = await ctx.newPage();
   watch(page, 'main');
-  const shot = (n) => page.screenshot({ path: path.join(SHOTS, `${n}.png`) });
+  const shot = async (n) => {
+    await page.waitForTimeout(450); // let slide-in animations settle
+    await page.screenshot({ path: path.join(SHOTS, `${n}.png`) });
+  };
   const addButton = page.locator('nav button[aria-label="Add food"]');
   const back = async () => {
     await top(page).getByRole('button', { name: /^(Back|Close)$/ }).first().click();
@@ -568,7 +577,7 @@ async function main() {
       expectNetworkErrors = true;
       await ctx.setOffline(true);
       await page.reload();
-      await page.getByText("Can't reach your laptop").waitFor({ timeout: 15000 });
+      await page.getByRole('heading', { name: "Can't reach your laptop" }).waitFor({ timeout: 15000 });
       await shot('51-shell-offline');
       await ctx.setOffline(false);
       await page.getByRole('tab', { name: 'Diary' }).waitFor({ timeout: 20000 });
@@ -594,13 +603,13 @@ async function main() {
       await top(page2).getByRole('button', { name: 'Scan a barcode' }).click();
       const scanner = page2.getByRole('dialog', { name: 'Scan a barcode' });
       await scanner.getByText('Hold the barcode inside the frame').waitFor({ timeout: 15000 });
-      await page2.screenshot({ path: path.join(SHOTS, '60-scanner.png') });
+      await snap(page2, '60-scanner.png');
       await scanner.getByPlaceholder('Or type the barcode number').fill('4000000000006');
       await scanner.getByRole('button', { name: 'Look up' }).click();
       const form = top(page2);
       await form.getByText(/Barcode 4000000000006 is not in the online database/).waitFor();
       assert((await form.getByRole('textbox', { name: 'Barcode' }).inputValue()) === '4000000000006', 'barcode should be pre-filled');
-      await page2.screenshot({ path: path.join(SHOTS, '61-unknown-barcode.png') });
+      await snap(page2, '61-unknown-barcode.png');
       await form.getByRole('textbox', { name: 'Name', exact: true }).fill('Corner shop muesli bar');
       await form.getByRole('textbox', { name: 'Energy' }).fill('410');
       await form.getByRole('button', { name: 'Save food' }).click();
@@ -626,7 +635,7 @@ async function main() {
       // kJ-only product: 180 kJ per 100 mL = 43 kcal; one 250 mL serving = 108 kcal. Protein is unknown.
       await detail.getByText('108').first().waitFor();
       await detail.getByText(/not known for this food/).waitFor();
-      await page2.screenshot({ path: path.join(SHOTS, '62-kj-product.png') });
+      await snap(page2, '62-kj-product.png');
     },
     page2,
   );
@@ -652,7 +661,7 @@ async function main() {
         const scanner = page3.getByRole('dialog', { name: 'Scan a barcode' });
         await scanner.getByText(/The camera only works on a secure \(https\) address/).waitFor();
         assert((await scanner.locator('video').count()) === 0, 'no camera view should be shown');
-        await page3.screenshot({ path: path.join(SHOTS, '70-insecure-scanner.png') });
+        await snap(page3, '70-insecure-scanner.png');
         await scanner.getByPlaceholder('Or type the barcode number').fill('9300633000011');
         await scanner.getByRole('button', { name: 'Look up' }).click();
         await top(page3).getByRole('heading', { name: 'Wholegrain Biscuits' }).waitFor();
@@ -691,7 +700,7 @@ async function main() {
       await page4.clock.fastForward('10:00');
       await page4.getByText('01/01/2027').waitFor({ timeout: 10000 });
       await page4.getByText('Today').first().waitFor();
-      await page4.screenshot({ path: path.join(SHOTS, '80-after-midnight.png') });
+      await snap(page4, '80-after-midnight.png');
       await quick(222);
       const before = await api(page4, 'GET', '/api/diary/2026-12-31');
       const after = await api(page4, 'GET', '/api/diary/2027-01-01');

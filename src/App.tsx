@@ -45,7 +45,10 @@ export function App() {
   };
 
   let body: ReactNode;
-  if (status.isPending) body = <Splash />;
+  // While the first attempts keep failing, say so right away instead of showing a spinner for minutes
+  // (the query keeps retrying in the background and the screen goes away by itself once it works).
+  if (status.isPending && status.failureCount > 0) body = <Unreachable error={status.failureReason} onRetry={() => status.refetch()} />;
+  else if (status.isPending) body = <Splash />;
   else if (status.isError) body = <Unreachable error={status.error} onRetry={() => status.refetch()} />;
   else if (!status.data.setup) body = <SetupScreen onDone={setAuthed} />;
   else if (!status.data.authed) body = <LoginScreen onDone={setAuthed} />;
@@ -63,6 +66,7 @@ export function App() {
 function SignedIn() {
   const boot = useBootstrap(true);
   useThemeSync(boot.data?.settings.theme ?? 'system');
+  if (boot.isPending && boot.failureCount > 0) return <Unreachable error={boot.failureReason} onRetry={() => boot.refetch()} />;
   if (boot.isPending) return <Splash />;
   if (boot.isError) return <Unreachable error={boot.error} onRetry={() => boot.refetch()} />;
   return (
@@ -87,9 +91,7 @@ function Unreachable({ error, onRetry }: { error: unknown; onRetry: () => void }
       <WifiOff size={40} className="text-muted" aria-hidden />
       <h1 className="mt-4 text-xl font-semibold">Can't reach your laptop</h1>
       <p className="mt-2 text-muted">{errorMessage(error)}</p>
-      <p className="mt-2 text-sm text-muted">
-        Make sure the laptop is on, awake, and the app window is still open. This page keeps trying on its own.
-      </p>
+      <p className="mt-2 text-sm text-muted">Keep the laptop's app window open. This page keeps trying on its own.</p>
       <Button className="mt-6" onClick={onRetry}>
         Try again
       </Button>

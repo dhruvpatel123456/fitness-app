@@ -151,9 +151,12 @@ export function DiaryScreen() {
     if (!t) return null;
     const remaining = t.kcal - totals.kcal + counted;
     const over = remaining < 0;
+    // Kilojoule numbers are one digit longer; shrink them a little so the row never feels cramped.
+    const longest = Math.max(energy(t.kcal).length, energy(totals.kcal).length, energy(burned).length, energy(Math.abs(remaining)).length);
+    const numberSize = longest >= 6 ? 'text-[16px]' : 'text-[19px]';
     const cell = (label: string, value: string, muted = false) => (
       <div className="min-w-0 flex-1 text-center">
-        <div className={cx('tabular text-[19px] font-bold leading-tight', muted && 'text-muted')}>{value}</div>
+        <div className={cx('tabular font-bold leading-tight', numberSize, muted && 'text-muted')}>{value}</div>
         <div className="text-[11px] font-medium uppercase tracking-wide text-muted">{label}</div>
       </div>
     );
@@ -172,7 +175,7 @@ export function DiaryScreen() {
           {cell(settings.exercise_adds_back ? 'Exercise' : 'Exercise*', energy(burned), !settings.exercise_adds_back)}
           {sign('=')}
           <div className="min-w-0 flex-1 text-center">
-            <div className={cx('tabular text-[19px] font-bold leading-tight', over ? 'text-danger' : 'text-primary')}>
+            <div className={cx('tabular font-bold leading-tight', numberSize, over ? 'text-danger' : 'text-primary')}>
               {energy(Math.abs(remaining))}
             </div>
             <div className={cx('text-[11px] font-semibold uppercase tracking-wide', over ? 'text-danger' : 'text-muted')}>{over ? 'Over' : 'Remaining'}</div>
