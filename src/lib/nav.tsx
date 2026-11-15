@@ -91,11 +91,14 @@ export function NavProvider({ children }: { children: ReactNode }) {
 
   return (
     <NavContext.Provider value={nav}>
-      <LayerContext.Provider value={{ index: -1, isTop: stack.length === 0 }}>{children}</LayerContext.Provider>
+      {/* Screens underneath the top one are made inert: they cannot be tapped, focused or read out. */}
+      <div className="contents" inert={stack.length > 0}>
+        <LayerContext.Provider value={{ index: -1, isTop: stack.length === 0 }}>{children}</LayerContext.Provider>
+      </div>
       {stack.map((entry, index) => (
-        <LayerContext.Provider key={entry.key} value={{ index, isTop: index === stack.length - 1 }}>
-          {entry.node}
-        </LayerContext.Provider>
+        <div key={entry.key} className="contents" inert={index !== stack.length - 1}>
+          <LayerContext.Provider value={{ index, isTop: index === stack.length - 1 }}>{entry.node}</LayerContext.Provider>
+        </div>
       ))}
     </NavContext.Provider>
   );

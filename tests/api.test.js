@@ -374,6 +374,21 @@ describe('foods and diary', () => {
     assert.equal((await app.patch(`/api/diary/entries/${uuid()}`, { quantity: 1 })).status, 404);
   });
 
+  test('editing an entry\'s serving is remembered for the next time the food is logged', async () => {
+    const created = (await app.post('/api/foods', foodBody({ name: 'Remember me', servings: [{ label: '1 cup', amount: 50 }] }))).json.food;
+    const entryId = uuid();
+    await app.post('/api/diary/entries', { id: entryId, date: '2026-10-01', meal: 0, food_id: created.id, unit: { label: '1 cup', amount: 50 }, quantity: 1 });
+    const before = (await app.get(`/api/foods/${created.id}`)).json.food;
+    assert.deepEqual(before.last, { label: '1 cup', amount: 50, quantity: 1 });
+    await app.patch(`/api/diary/entries/${entryId}`, { unit: { label: 'g', amount: 1 }, quantity: 120 });
+    const after = (await app.get(`/api/foods/${created.id}`)).json.food;
+    assert.deepEqual(after.last, { label: 'g', amount: 1, quantity: 120 });
+    assert.equal(after.use_count, before.use_count, 'editing is not another use');
+    // Changing only the meal leaves the remembered serving alone.
+    await app.patch(`/api/diary/entries/${entryId}`, { meal: 1 });
+    assert.deepEqual((await app.get(`/api/foods/${created.id}`)).json.food.last, { label: 'g', amount: 1, quantity: 120 });
+  });
+
   test('diary input is validated', async () => {
     const good = { id: uuid(), date: DAY, meal: 0, food_id: oats.id, unit: { label: 'g', amount: 1 }, quantity: 10 };
     const cases = [

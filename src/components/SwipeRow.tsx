@@ -78,7 +78,7 @@ export function SwipeRow({ onDelete, children }: { onDelete: () => void; childre
             suppressClick.current = false;
           }
         }}
-        className="relative bg-surface"
+        className="relative select-none bg-surface"
         style={{
           transform: `translateX(${dx}px)`,
           transition: dragging ? 'none' : 'transform 0.16s ease-out',

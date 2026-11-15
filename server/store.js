@@ -264,3 +264,13 @@ export function touchFood(db, foodId, unit, quantity) {
      WHERE id = ?`,
   ).run(nowIso(), unit.label, unit.amount, quantity, foodId);
 }
+
+/** Remember the serving most recently chosen for a food (without counting it as another use). */
+export function rememberServing(db, foodId, unit, quantity) {
+  db.prepare('UPDATE foods SET last_unit_label = ?, last_unit_amount = ?, last_quantity = ? WHERE id = ?').run(
+    unit.label,
+    unit.amount,
+    quantity,
+    foodId,
+  );
+}

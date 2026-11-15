@@ -6,6 +6,7 @@ import {
   getFoodRow,
   getTargetHistory,
   insertDiaryEntry,
+  rememberServing,
   snapshotFromFood,
   snapshotFromQuick,
   targetsForDate,
@@ -176,6 +177,10 @@ export function diaryRoutes({ db }) {
       nowIso(),
       id,
     );
+    // The serving you settled on is what one-tap logging offers next time.
+    if (row.kind === 'food' && row.food_id && (b.unit !== undefined || b.quantity !== undefined)) {
+      rememberServing(db, row.food_id, { label: next.unit_label, amount: next.unit_amount }, next.quantity);
+    }
     res.json({ entry: entryFromRow(db.prepare('SELECT * FROM diary_entries WHERE id = ?').get(id)) });
   });
 
