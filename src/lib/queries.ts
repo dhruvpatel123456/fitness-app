@@ -316,8 +316,8 @@ export async function deleteMeasurement(id: string) {
   refresh('measurements');
 }
 
-/** Save settings/profile/targets; the server answers with the fresh app state. */
-export async function saveAndReload(method: 'PUT', path: string, body: unknown) {
+/** Save settings, profile or targets; the server answers with the fresh app state. */
+export async function putBoot(path: string, body: unknown) {
   const boot = await put<Bootstrap>(path, body);
   queryClient.setQueryData(['bootstrap'], boot);
   refresh('diary', 'stats');

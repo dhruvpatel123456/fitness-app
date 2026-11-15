@@ -60,6 +60,11 @@ export function AppProvider({ boot, children }: { boot: Bootstrap; children: Rea
 
   const setDate = useCallback((next: string) => setPicked(next === localDate() ? null : next), []);
 
+  // If the picked day has become today (for example "tomorrow" after midnight), follow the calendar again.
+  useEffect(() => {
+    if (picked !== null && picked === today) setPicked(null);
+  }, [picked, today]);
+
   const unit = boot.settings.energy_unit;
   const value = useMemo<AppState>(
     () => ({

@@ -67,9 +67,6 @@ export function Onboarding() {
       return;
     }
     setShowErrors(false);
-    if (step === 0 && a.weeklyGoal === null && goalWeight === null) {
-      // Nothing chosen yet; the next step starts blank.
-    }
     if (step === 1 && calc) {
       const kcal = Math.max(500, calc.suggested);
       setDraft(draftFromTargets({ kcal, ...macroGrams(kcal, DEFAULT_MACRO_SPLIT) }, 'percent', unit));
