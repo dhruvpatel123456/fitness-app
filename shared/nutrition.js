@@ -6,11 +6,19 @@
 //  * Values are never rounded here. Rounding happens only when displaying.
 //  * A missing value is `null` ("unknown"), which is different from 0.
 
+/** @typedef {'kcal' | 'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar' | 'sat_fat' | 'sodium'} NutrientKey */
+/** @typedef {Record<NutrientKey, number | null>} Nutrients */
+/** @typedef {Record<NutrientKey, number>} NutrientTotals */
+
 export const KJ_PER_KCAL = 4.184;
 
-/** The nutrients tracked, in display order. `kcal` is always first. */
+/**
+ * The nutrients tracked, in display order. `kcal` is always first.
+ * @type {NutrientKey[]}
+ */
 export const NUTRIENTS = ['kcal', 'protein', 'carbs', 'fat', 'fibre', 'sugar', 'sat_fat', 'sodium'];
 
+/** @type {Record<NutrientKey, { label: string, unit: string, max100: number }>} */
 export const NUTRIENT_INFO = {
   kcal: { label: 'Energy', unit: 'kcal', max100: 950 },
   protein: { label: 'Protein', unit: 'g', max100: 100 },
@@ -30,9 +38,13 @@ export function isKnown(v) {
   return typeof v === 'number' && Number.isFinite(v);
 }
 
-/** Pick the nutrient fields of any object into a clean per-100 record. */
+/**
+ * Pick the nutrient fields of any object into a clean per-100 record.
+ * @param {any} src
+ * @returns {Nutrients}
+ */
 export function pickNutrition(src) {
-  const out = {};
+  const out = /** @type {Nutrients} */ ({});
   for (const k of NUTRIENTS) out[k] = src && isKnown(src[k]) ? src[k] : null;
   return out;
 }
@@ -40,9 +52,12 @@ export function pickNutrition(src) {
 /**
  * Nutrition for `amount` base units (g or mL), from per-100 values.
  * Unknown values stay unknown.
+ * @param {any} per100
+ * @param {number} amount
+ * @returns {Nutrients}
  */
 export function scaleNutrition(per100, amount) {
-  const out = {};
+  const out = /** @type {Nutrients} */ ({});
   for (const k of NUTRIENTS) out[k] = isKnown(per100?.[k]) ? (per100[k] * amount) / 100 : null;
   return out;
 }
@@ -50,9 +65,12 @@ export function scaleNutrition(per100, amount) {
 /**
  * Convert label values given for one serving of `servingAmount` g/mL into
  * per-100 values.
+ * @param {any} values
+ * @param {number} servingAmount
+ * @returns {Nutrients}
  */
 export function per100FromServing(values, servingAmount) {
-  const out = {};
+  const out = /** @type {Nutrients} */ ({});
   for (const k of NUTRIENTS) {
     out[k] = isKnown(values?.[k]) && servingAmount > 0 ? (values[k] / servingAmount) * 100 : null;
   }
@@ -64,7 +82,11 @@ export function totalAmount(unitAmount, quantity) {
   return unitAmount * quantity;
 }
 
-/** Nutrition of one diary entry / ingredient (it carries per-100 values and an amount). */
+/**
+ * Nutrition of one diary entry / ingredient (it carries per-100 values and an amount).
+ * @param {any} entry
+ * @returns {Nutrients}
+ */
 export function entryNutrition(entry) {
   return scaleNutrition(entry, entry.amount);
 }
@@ -73,10 +95,12 @@ export function entryNutrition(entry) {
  * Add up nutrition records. Unknown values are skipped, and `unknown[k]`
  * counts how many records had no value for nutrient k, so totals can be
  * labelled as incomplete instead of silently treating unknown as zero.
+ * @param {any[]} records
+ * @returns {{ totals: NutrientTotals, unknown: NutrientTotals }}
  */
 export function sumNutrition(records) {
-  const totals = {};
-  const unknown = {};
+  const totals = /** @type {NutrientTotals} */ ({});
+  const unknown = /** @type {NutrientTotals} */ ({});
   for (const k of NUTRIENTS) {
     totals[k] = 0;
     unknown[k] = 0;
@@ -97,6 +121,8 @@ export function baseUnitLabel(baseUnit) {
 /**
  * The serving units a food can be logged in:
  * "100 g", each named serving ("1 slice (30 g)"), and a free amount in g/mL.
+ * @param {{ base_unit: string, servings?: { label: string, amount: number }[] }} food
+ * @returns {{ key: string, label: string, amount: number }[]}
  */
 export function unitOptions(food) {
   const u = baseUnitLabel(food.base_unit);
@@ -122,6 +148,9 @@ export function unitOptions(food) {
  * cookedWeight: optional final weight in grams (cooking changes the weight).
  *
  * A nutrient is unknown for the recipe if it is unknown for any ingredient.
+ * @param {any[]} ingredients
+ * @param {number} servings
+ * @param {number | null} [cookedWeight]
  */
 export function recipeNutrition(ingredients, servings, cookedWeight) {
   const parts = ingredients.map((i) => scaleNutrition(i, i.amount));
@@ -129,9 +158,10 @@ export function recipeNutrition(ingredients, servings, cookedWeight) {
   const rawWeight = ingredients.reduce((a, i) => a + (isKnown(i.amount) ? i.amount : 0), 0);
   const weight = isKnown(cookedWeight) && cookedWeight > 0 ? cookedWeight : rawWeight;
   const n = isKnown(servings) && servings > 0 ? servings : 1;
-  const total = {};
-  const perServing = {};
-  const per100 = {};
+  const total = /** @type {Nutrients} */ ({});
+  const perServing = /** @type {Nutrients} */ ({});
+  const per100 = /** @type {Nutrients} */ ({});
+  /** @type {NutrientKey[]} */
   const missing = [];
   for (const k of NUTRIENTS) {
     const known = ingredients.length > 0 && unknown[k] === 0;
@@ -158,8 +188,13 @@ export function macroPercentages(protein, carbs, fat) {
   return { protein: (p / total) * 100, carbs: (c / total) * 100, fat: (f / total) * 100 };
 }
 
-/** Validate a per-100 record. Returns a list of problems (empty when fine). */
+/**
+ * Validate a per-100 record. Returns a list of problems (empty when fine).
+ * @param {any} per100
+ * @returns {{ field: NutrientKey, message: string }[]}
+ */
 export function nutritionProblems(per100) {
+  /** @type {{ field: NutrientKey, message: string }[]} */
   const problems = [];
   for (const k of NUTRIENTS) {
     const v = per100?.[k];

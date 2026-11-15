@@ -191,7 +191,7 @@ export function FoodForm({
           <Field label="Barcode (optional)" error={show('barcode')}>
             <TextInput aria-label="Barcode" inputMode="numeric" value={code} maxLength={16} onChange={(e) => setCode(e.target.value.replace(/[^\d\s]/g, ''))} />
           </Field>
-          <Field label="Measured in">
+          <Field group label="Measured in">
             <Segmented
               label="Measured in"
               value={baseUnit}

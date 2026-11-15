@@ -155,7 +155,7 @@ export function Onboarding() {
             <h1 className="text-2xl font-bold">About you</h1>
             <p className="mb-5 mt-1 text-muted">This is used to work out how much energy your body uses in a day.</p>
             <Card className="space-y-4 p-4">
-              <Field label="Sex (used in the energy formula)" error={err(a.sex === '', 'Choose one.')}>
+              <Field group label="Sex (used in the energy formula)" error={err(a.sex === '', 'Choose one.')}>
                 <Segmented
                   label="Sex"
                   value={a.sex}
@@ -248,29 +248,29 @@ export function Onboarding() {
             <p className="mb-5 mt-1 text-muted">Worked out from your answers. Adjust anything you like.</p>
             <Card className="p-4">
               <dl className="space-y-2 text-[15px]">
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-3">
                   <dt className="text-muted">Energy your body uses at rest (BMR)</dt>
-                  <dd className="tabular font-semibold">
+                  <dd className="tabular shrink-0 whitespace-nowrap font-semibold">
                     {energy(calc.bmr)} {unit}
                   </dd>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-3">
                   <dt className="text-muted">With your activity level</dt>
-                  <dd className="tabular font-semibold">
+                  <dd className="tabular shrink-0 whitespace-nowrap font-semibold">
                     {energy(calc.tdee)} {unit}
                   </dd>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between gap-3">
                   <dt className="text-muted">
                     {calc.delta === 0 ? 'To maintain your weight' : calc.delta < 0 ? `To lose ${fmt(Math.abs(a.weeklyGoal ?? 0), 2)} kg a week` : `To gain ${fmt(a.weeklyGoal ?? 0, 2)} kg a week`}
                   </dt>
-                  <dd className="tabular font-semibold">
+                  <dd className="tabular shrink-0 whitespace-nowrap font-semibold">
                     {calc.delta === 0 ? '±0' : `${calc.delta < 0 ? '−' : '+'}${energy(Math.abs(calc.delta))}`} {unit}
                   </dd>
                 </div>
                 <div className="flex justify-between border-t border-line pt-2 text-base">
                   <dt className="font-semibold">Suggested daily target</dt>
-                  <dd className="tabular font-bold text-primary">
+                  <dd className="tabular shrink-0 whitespace-nowrap font-bold text-primary">
                     {energy(calc.suggested)} {unit}
                   </dd>
                 </div>

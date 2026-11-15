@@ -248,7 +248,8 @@ export function Scanner({ onFound, onCreate }: { onFound: (food: Food) => void; 
     <div className="fixed inset-0 flex flex-col bg-black text-white" style={{ zIndex: 30 + index }} role="dialog" aria-modal="true" aria-label="Scan a barcode">
       {cameraLive && <video ref={video} playsInline muted autoPlay className="absolute inset-0 h-full w-full object-cover" />}
 
-      <div className="pt-safe px-safe relative z-10 flex items-center justify-between p-2">
+      <div className="pt-safe px-safe relative z-10">
+        <div className="flex items-center justify-between p-2">
         <button type="button" aria-label="Close scanner" onClick={() => nav.pop()} className="flex h-12 w-12 items-center justify-center rounded-full bg-black/50">
           <X size={26} />
         </button>
@@ -263,6 +264,7 @@ export function Scanner({ onFound, onCreate }: { onFound: (food: Food) => void; 
             {torchOn ? <Flashlight size={24} /> : <FlashlightOff size={24} />}
           </button>
         )}
+        </div>
       </div>
 
       <div className="relative z-10 flex min-h-0 flex-1 items-center justify-center px-8">

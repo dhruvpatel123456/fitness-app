@@ -123,7 +123,7 @@ export function SettingsScreen() {
 
           <SectionTitle>Display</SectionTitle>
           <Card className="space-y-4 p-4">
-            <Field label="Energy unit">
+            <Field group label="Energy unit">
               <Segmented
                 label="Energy unit"
                 value={s.energy_unit}
@@ -134,7 +134,7 @@ export function SettingsScreen() {
                 ]}
               />
             </Field>
-            <Field label="Theme">
+            <Field group label="Theme">
               <Segmented
                 label="Theme"
                 value={s.theme}
@@ -223,7 +223,7 @@ function ProfilePage() {
       }
     >
       <Card className="space-y-4 p-4">
-        <Field label="Sex (used in the energy formula)">
+        <Field group label="Sex (used in the energy formula)">
           <Segmented
             label="Sex"
             value={sex}
@@ -348,21 +348,21 @@ function GoalsPage() {
           <Card className="p-4">
             <h2 className="font-semibold">Worked out from your profile</h2>
             <dl className="mt-2 space-y-1.5 text-[15px]">
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt className="text-muted">At rest (BMR, Mifflin-St Jeor)</dt>
-                <dd className="tabular font-semibold">
+                <dd className="tabular shrink-0 whitespace-nowrap font-semibold">
                   {energy(calc.bmr)} {unit}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt className="text-muted">With your activity level</dt>
-                <dd className="tabular font-semibold">
+                <dd className="tabular shrink-0 whitespace-nowrap font-semibold">
                   {energy(calc.tdee)} {unit}
                 </dd>
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between gap-3">
                 <dt className="text-muted">For your weekly goal, at {fmt(weight ?? 0, 1)} kg</dt>
-                <dd className="tabular font-bold text-primary">
+                <dd className="tabular shrink-0 whitespace-nowrap font-bold text-primary">
                   {energy(calc.suggested)} {unit}
                 </dd>
               </div>

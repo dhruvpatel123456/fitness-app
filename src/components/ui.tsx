@@ -237,7 +237,7 @@ export function Sheet({
             <X size={22} />
           </IconButton>
         </div>
-        <div className="scroll-area px-safe min-h-0 flex-1 px-5 pb-4">{children}</div>
+        <div className="scroll-area min-h-0 flex-1 px-5 pb-4">{children}</div>
         {footer ? (
           <div className="pb-safe shrink-0 border-t border-line">
             <div className="px-5 py-3">{footer}</div>
@@ -289,15 +289,18 @@ export function Field({
   error,
   children,
   className,
+  group,
 }: {
   label?: ReactNode;
   hint?: ReactNode;
   error?: string | null;
   children: ReactNode;
   className?: string;
+  /** For a set of buttons rather than one input: the caption must not act as a label for the first button. */
+  group?: boolean;
 }) {
-  return (
-    <label className={cx('block', className)}>
+  const inner = (
+    <>
       {label && <span className="mb-1 block text-[13px] font-medium text-muted">{label}</span>}
       {children}
       {error ? (
@@ -307,7 +310,14 @@ export function Field({
       ) : (
         hint && <span className="mt-1 block text-[13px] text-muted">{hint}</span>
       )}
-    </label>
+    </>
+  );
+  return group ? (
+    <div role="group" className={cx('block', className)}>
+      {inner}
+    </div>
+  ) : (
+    <label className={cx('block', className)}>{inner}</label>
   );
 }
 
