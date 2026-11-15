@@ -16,7 +16,8 @@
     "dev:server": "node --watch server/index.js",
     "typecheck": "tsc --noEmit",
     "test": "node --test --test-reporter=spec \"tests/*.test.js\"",
-    "backup": "node scripts/backup-now.js"
+    "backup": "node scripts/backup-now.js",
+    "restore": "node scripts/restore.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
