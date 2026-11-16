@@ -251,6 +251,41 @@ describe('barcode lookup and online search', () => {
   });
 });
 
+describe('one time limit for a whole search', () => {
+  let app;
+  let mock;
+  before(async () => {
+    mock = await startMockOnline();
+    app = await startApp({
+      env: { OFF_BASE_URL: mock.url, USDA_BASE_URL: mock.url, USDA_API_KEY: 'TESTKEY', OFF_COUNTRY: 'australia', ONLINE_TIMEOUT_MS: '400' },
+    });
+    await onboard(app);
+  });
+  after(async () => {
+    await app.close();
+    await mock.close();
+  });
+
+  test('a slow first answer does not earn the wider search a second full wait', async () => {
+    // Each request takes 300 ms. The Australian search answers in time but finds little, so the app
+    // would normally search the whole world too; that would double the wait (600 ms) past the limit.
+    mock.state.slowMs = 300;
+    const started = Date.now();
+    const res = await app.get('/api/search/online?q=biscuits');
+    const took = Date.now() - started;
+    assert.equal(res.json.sources.off, 'ok');
+    assert.ok(res.json.items.some((i) => i.name === 'Wholegrain Biscuits'), 'the Australian results are still returned');
+    assert.ok(took < 480, `the whole search stayed near one time limit (took ${took} ms)`);
+    mock.state.slowMs = 0;
+  });
+
+  test('with a quick answer the wider search still runs', async () => {
+    const res = await app.get('/api/search/online?q=juice');
+    assert.equal(res.json.sources.off, 'ok');
+    assert.ok(res.json.items.length >= 1);
+  });
+});
+
 describe('without a USDA key, and with an unreachable address', () => {
   let app;
   before(async () => {

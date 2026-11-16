@@ -448,7 +448,7 @@ export function Segmented<T extends string | number>({
           aria-selected={o.value === value}
           onClick={() => onChange(o.value)}
           className={cx(
-            'min-h-10 min-w-0 flex-1 rounded-lg px-2 text-[14px] font-semibold transition-colors',
+            'min-h-11 min-w-0 flex-1 rounded-lg px-2 text-[14px] font-semibold transition-colors',
             o.value === value ? 'bg-surface text-ink shadow-card' : 'text-muted',
           )}
         >

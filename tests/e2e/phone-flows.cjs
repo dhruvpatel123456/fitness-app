@@ -587,6 +587,402 @@ async function main() {
   );
 
   // =========================================================================
+  // 1b. More acceptance checks on the same data: touch gestures, layout,
+  //     targets, slow or failing food databases, wipe and restore
+  // =========================================================================
+  console.log('\nTouch, layout and data safety');
+  const layoutProblems = [];
+
+  /** Real touch input (not mouse), the way a finger moves. */
+  const cdp = await ctx.newCDPSession(page);
+  const touchSwipe = async (from, to, steps = 10) => {
+    const at = (x, y) => [{ x, y, id: 1 }];
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: at(from.x, from.y) });
+    for (let i = 1; i <= steps; i++) {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchMove',
+        touchPoints: at(from.x + ((to.x - from.x) * i) / steps, from.y + ((to.y - from.y) * i) / steps),
+      });
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+
+  /** Look at what is on screen right now: tap targets under 44 px and anything wider than the screen. */
+  async function auditHere(label, { targets = true } = {}) {
+    await page.waitForTimeout(450);
+    const found = await page.evaluate((checkTargets) => {
+      const small = [];
+      const overflow = [];
+      const shown = (el) => {
+        const r = el.getBoundingClientRect();
+        const cs = getComputedStyle(el);
+        return r.width > 0 && r.height > 0 && cs.visibility !== 'hidden' && cs.display !== 'none' && !el.closest('[inert]') && !el.closest('.sr-only');
+      };
+      if (checkTargets) {
+        const sel = 'button, a[href], input:not([type=hidden]):not([type=file]), select, textarea, [role=tab], [role=button], summary';
+        for (const el of document.querySelectorAll(sel)) {
+          if (!shown(el) || el.classList.contains('sr-only')) continue;
+          const r = el.getBoundingClientRect();
+          if (r.width < 43.5 || r.height < 43.5) {
+            const name = (el.getAttribute('aria-label') || el.textContent || el.getAttribute('placeholder') || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+            small.push(`<${el.tagName.toLowerCase()}> "${name}" is ${Math.round(r.width)}x${Math.round(r.height)}`);
+          }
+        }
+      }
+      if (document.documentElement.scrollWidth > window.innerWidth + 1) overflow.push(`page is ${document.documentElement.scrollWidth}px wide on a ${window.innerWidth}px screen`);
+      for (const el of document.querySelectorAll('.scroll-area, [role=dialog]')) {
+        if (shown(el) && el.scrollWidth > el.clientWidth + 1) overflow.push(`${el.getAttribute('aria-label') || el.className.toString().slice(0, 30)} scrolls sideways (${el.scrollWidth} > ${el.clientWidth})`);
+      }
+      return { small, overflow };
+    }, targets);
+    for (const m of found.small) layoutProblems.push(`${label}: ${m}`);
+    for (const m of found.overflow) layoutProblems.push(`${label}: ${m}`);
+  }
+
+  await step(
+    'swipe sideways on the top of the diary to change day (real touch)',
+    async () => {
+      await page.getByRole('tab', { name: 'Diary' }).click(); // tapping the active tab returns to today
+      const header = page.locator('header').first();
+      await header.getByText('Today', { exact: true }).waitFor();
+      const box = await header.boundingBox();
+      const y = box.y + box.height / 2;
+      await touchSwipe({ x: 300, y }, { x: 80, y });
+      await header.getByText('Tomorrow', { exact: true }).waitFor({ timeout: 5000 });
+      await touchSwipe({ x: 80, y }, { x: 300, y });
+      await header.getByText('Today', { exact: true }).waitFor({ timeout: 5000 });
+      await touchSwipe({ x: 80, y }, { x: 300, y });
+      await header.getByText('Yesterday', { exact: true }).waitFor({ timeout: 5000 });
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      await header.getByText('Today', { exact: true }).waitFor();
+    },
+    page,
+  );
+
+  await step(
+    'swipe-to-delete works with real touch, and Undo brings the entry back',
+    async () => {
+      await page.getByRole('button', { name: 'Snacks options' }).click();
+      await top(page).getByRole('button', { name: 'Quick add energy' }).click();
+      await top(page).getByRole('textbox', { name: 'Energy' }).fill('77');
+      await top(page).getByRole('button', { name: 'Add to diary' }).click();
+      await page.waitForTimeout(500);
+      const before = (await summary(page)).food;
+      const row = page.getByRole('button', { name: /Quick add/ }).last();
+      await row.scrollIntoViewIfNeeded();
+      const box = await row.boundingBox();
+      const y = box.y + box.height / 2;
+      await touchSwipe({ x: box.x + box.width - 30, y }, { x: box.x + 30, y }, 12);
+      await page.getByText('Removed Quick add').waitFor({ timeout: 5000 });
+      await page.waitForTimeout(300);
+      assert(near((await summary(page)).food, before - 77), 'swiping away a 77 kcal quick add should lower the total by 77');
+      await page.getByRole('button', { name: 'Undo' }).click();
+      await page.waitForTimeout(500);
+      assert(near((await summary(page)).food, before), 'Undo should put it back');
+    },
+    page,
+  );
+
+  await step(
+    'number fields bring up the numeric keypad',
+    async () => {
+      await addButton.click();
+      await top(page).getByRole('button', { name: 'Create a food' }).click();
+      const form = top(page);
+      for (const name of ['Energy', 'Protein', 'Carbohydrate']) {
+        const mode = await form.getByRole('textbox', { name, exact: true }).first().getAttribute('inputmode');
+        assert(mode === 'decimal' || mode === 'numeric', `${name} should use a numeric keypad, found inputmode=${mode}`);
+      }
+      assert((await form.locator('input[type=number]').count()) === 0, 'no input should use type=number (it breaks decimals on some phones)');
+      await page.goBack();
+      await page.goBack();
+    },
+    page,
+  );
+
+  await step(
+    'goals: the Saturday target applies on Saturdays only',
+    async () => {
+      const info = await page.evaluate(() => {
+        const d = new Date();
+        let n = 0;
+        while (d.getDay() !== 6) {
+          d.setDate(d.getDate() + 1);
+          n++;
+        }
+        return { n, date: new Intl.DateTimeFormat('en-CA').format(d) };
+      });
+      const sat = await api(page, 'GET', `/api/diary/${info.date}`);
+      assert(sat.json.targets.kcal === 2500, `Saturday ${info.date} should have the 2,500 target, got ${sat.json.targets.kcal}`);
+      const sun = await page.evaluate(async (date) => {
+        const d = new Date(`${date}T12:00:00`);
+        d.setDate(d.getDate() + 1);
+        const next = new Intl.DateTimeFormat('en-CA').format(d);
+        return { next, json: await (await fetch(`/api/diary/${next}`)).json() };
+      }, info.date);
+      assert(sun.json.targets.kcal === 2210, `Sunday ${sun.next} should keep the 2,210 target, got ${sun.json.targets.kcal}`);
+      // And on screen:
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      for (let i = 0; i < info.n; i++) await page.getByRole('button', { name: 'Next day' }).click();
+      await page.getByText('Weekday target', { exact: true }).waitFor();
+      const s = await summary(page);
+      assert(s.goal === 2500, `diary on Saturday should show a 2,500 goal, got ${s.goal}`);
+      await page.getByRole('tab', { name: 'Diary' }).click();
+    },
+    page,
+  );
+
+  await step(
+    'exercise can be left out of the daily budget',
+    async () => {
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      const on = await summary(page);
+      assert(on.exercise > 0, 'there should be exercise logged today');
+      await page.getByRole('tab', { name: 'Settings' }).click();
+      await page.getByText('Add exercise to my daily budget', { exact: true }).click();
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      const off = await summary(page);
+      assert(near(off.remaining, on.remaining - on.exercise), `remaining should drop by the exercise (${on.exercise}), ${on.remaining} -> ${off.remaining}`);
+      await page.getByText('Exercise*', { exact: true }).waitFor();
+      await page.getByRole('tab', { name: 'Settings' }).click();
+      await page.getByText('Add exercise to my daily budget', { exact: true }).click();
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      assert(near((await summary(page)).remaining, on.remaining), 'turning it back on should restore the remaining energy');
+    },
+    page,
+  );
+
+  await step(
+    'tap targets are 44 px and nothing scrolls sideways (390 px wide)',
+    async () => {
+      const visit = async (label, open, close) => {
+        await open();
+        await auditHere(label);
+        if (close) await close();
+      };
+      const closeTop = async () => {
+        await page.goBack();
+        await page.waitForTimeout(150);
+      };
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      await auditHere('diary (top)');
+      await page.evaluate(() => document.querySelector('.scroll-area').scrollTo(0, 99999));
+      await auditHere('diary (bottom)');
+      await page.evaluate(() => document.querySelector('.scroll-area').scrollTo(0, 0));
+      await visit('add food', async () => addButton.click());
+      await top(page).getByRole('button', { name: 'Select several foods' }).click();
+      await auditHere('add food (multi-select)');
+      await top(page).getByRole('button', { name: 'Stop selecting several' }).click();
+      await top(page).getByRole('tab', { name: 'Recent' }).click();
+      await auditHere('add food (recent)');
+      await top(page).getByRole('tab', { name: 'Saved Meals' }).click();
+      await auditHere('add food (saved meals)');
+      await top(page).getByRole('tab', { name: 'Recent' }).click();
+      await top(page).getByRole('button', { name: /^Rolled oats/ }).first().click();
+      await auditHere('food details');
+      await closeTop();
+      await top(page).getByRole('tab', { name: 'Search' }).click();
+      await top(page).getByRole('button', { name: 'Create a food' }).click();
+      await auditHere('create a food');
+      await closeTop();
+      await closeTop();
+      await visit('foods', async () => page.getByRole('tab', { name: 'Foods', exact: true }).click());
+      for (const tab of ['My Foods', 'Recipes', 'Saved Meals']) {
+        const t = page.getByRole('tab', { name: tab });
+        if (await t.count()) {
+          await t.click();
+          await auditHere(`foods (${tab})`);
+        }
+      }
+      await page.getByRole('tab', { name: 'Progress' }).click();
+      for (const tab of ['Weight', 'Calories', 'Macros', 'Body']) {
+        await page.getByRole('tab', { name: tab, exact: true }).click();
+        await page.waitForTimeout(700); // charts draw in
+        await auditHere(`progress (${tab})`);
+      }
+      await page.getByRole('tab', { name: 'Settings' }).click();
+      await auditHere('settings');
+      for (const [label, name] of [
+        ['profile', /^Profile/],
+        ['goals', /Goals and targets/],
+        ['meal names', /Meal names/],
+        ['water', /^Water/],
+        ['PIN', /PIN/],
+        ['install', /Install on this phone/],
+        ['data', /Data and backups/],
+      ]) {
+        const row = page.getByRole('button', { name }).first();
+        if (!(await row.count())) continue;
+        await row.click();
+        await auditHere(`settings: ${label}`);
+        await closeTop();
+      }
+      await page.getByRole('tab', { name: 'Diary' }).click();
+    },
+    page,
+  );
+
+  await step(
+    'nothing scrolls sideways on a small phone (320 px wide)',
+    async () => {
+      const original = page.viewportSize();
+      await page.setViewportSize({ width: 320, height: 568 });
+      await page.waitForTimeout(300);
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      await auditHere('320: diary', { targets: false });
+      await addButton.click();
+      await auditHere('320: add food', { targets: false });
+      await top(page).getByRole('tab', { name: 'Recent' }).click();
+      await top(page).getByRole('button', { name: /^Rolled oats/ }).first().click();
+      await auditHere('320: food details', { targets: false });
+      await page.goBack();
+      await page.goBack();
+      for (const tab of ['Progress', 'Foods', 'Settings']) {
+        await page.getByRole('tab', { name: tab, exact: true }).click();
+        await page.waitForTimeout(700);
+        await auditHere(`320: ${tab}`, { targets: false });
+      }
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      await page.setViewportSize(original);
+    },
+    page,
+  );
+
+  await step(
+    'layout audit result',
+    async () => {
+      const unique = [...new Set(layoutProblems)];
+      assert(unique.length === 0, `${unique.length} layout problem(s):\n         ${unique.join('\n         ')}`);
+    },
+    page,
+  );
+
+  // --- slow or failing online food databases (needs the stand-in server's control URL) ---
+  const MOCK = process.env.MOCK_URL || 'http://127.0.0.1:4010';
+  const mockState = async (query) => {
+    try {
+      await fetch(`${MOCK}/__state?${query}`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  if (await mockState('down=0&slowMs=0')) {
+    await step(
+      'slow food databases: your own foods show at once, a notice follows after 5 seconds, logging still works',
+      async () => {
+        await mockState('slowMs=9000');
+        const started = Date.now();
+        await addButton.click();
+        const add = top(page);
+        await add.getByPlaceholder('Search foods').fill('rolled');
+        await add.getByRole('button', { name: /^Add Rolled oats to / }).waitFor({ timeout: 3000 });
+        const localMs = Date.now() - started;
+        assert(localMs < 3000, `own foods should appear straight away, took ${localMs} ms`);
+        await add.getByText('Searching online…').waitFor({ timeout: 3000 });
+        await add.getByText(/took too long to answer/).first().waitFor({ timeout: 12000 });
+        const noticeMs = Date.now() - started;
+        assert(noticeMs > 4500 && noticeMs < 11000, `the notice should come after about 5 seconds, came after ${noticeMs} ms`);
+        await shot('52-slow-online');
+        const before = (await (async () => {
+          await page.goBack();
+          return summary(page);
+        })()).food;
+        await addButton.click();
+        await top(page).getByRole('tab', { name: 'Recent' }).click();
+        await top(page).getByRole('button', { name: /^Add Rolled oats to / }).click();
+        await page.getByText(/Added Rolled oats to /).waitFor();
+        await toDiary();
+        await page.waitForTimeout(400);
+        assert((await summary(page)).food > before + 100, 'a previously used food can still be logged while the online sources are slow');
+      },
+      page,
+    );
+    await step(
+      'online databases failing: a notice, previously used foods and scanned barcodes still work',
+      async () => {
+        await mockState('down=1&slowMs=0');
+        await addButton.click();
+        const add = top(page);
+        await add.getByPlaceholder('Search foods').fill('wholegrain');
+        await add.getByRole('button', { name: /^Add Wholegrain Biscuits to / }).waitFor({ timeout: 3000 });
+        await add.getByText(/had a problem|could not be reached|unavailable|paused/).first().waitFor({ timeout: 12000 });
+        await page.goBack();
+        const known = await api(page, 'GET', '/api/barcode/9300633000011');
+        assert(known.json.status === 'found' && known.json.origin === 'local', `a barcode scanned before should be found locally, got ${JSON.stringify(known.json)}`);
+        const unknown = await api(page, 'GET', '/api/barcode/4000000000099');
+        assert(unknown.json.status === 'unavailable', `an unknown barcode while the database is down should say so, got ${JSON.stringify(unknown.json)}`);
+        await mockState('down=0&slowMs=0');
+      },
+      page,
+    );
+    await mockState('down=0&slowMs=0');
+  } else {
+    console.log('  skip slow/failing online database checks (no stand-in server at ' + MOCK + ')');
+  }
+
+  await step(
+    'the phone follows the system dark/light setting by default',
+    async () => {
+      const dark = await browser.newContext({ ...phone, colorScheme: 'dark' });
+      const dp = await dark.newPage();
+      watch(dp, 'dark');
+      await dp.goto(APP);
+      await login(dp);
+      assert(await dp.evaluate(() => document.documentElement.classList.contains('dark')), 'a phone set to dark should get the dark theme');
+      await dp.screenshot({ path: path.join(SHOTS, '53-system-dark.png') });
+      await dark.close();
+      const light = await browser.newContext({ ...phone, colorScheme: 'light' });
+      const lp = await light.newPage();
+      watch(lp, 'light');
+      await lp.goto(APP);
+      await login(lp);
+      assert(!(await lp.evaluate(() => document.documentElement.classList.contains('dark'))), 'a phone set to light should get the light theme');
+      await light.close();
+    },
+    page,
+  );
+
+  await step(
+    'export, erase everything, then restore from the file: all data is back',
+    async () => {
+      const before = await api(page, 'GET', '/api/export/json');
+      assert(before.status === 200, 'export should work');
+      const countBefore = Object.fromEntries(Object.entries(before.json.tables).map(([k, v]) => [k, v.length]));
+      const file = path.join(SHOTS, 'export-for-restore.json');
+      fs.writeFileSync(file, JSON.stringify(before.json));
+      await page.getByRole('tab', { name: 'Diary' }).click();
+      const goalBefore = (await summary(page)).goal;
+      const foodBefore = (await summary(page)).food;
+
+      await page.getByRole('tab', { name: 'Settings' }).click();
+      await page.getByRole('button', { name: /Data and backups/ }).click();
+      await top(page).getByRole('button', { name: 'Erase all data…' }).click();
+      await top(page).getByLabel('PIN', { exact: true }).fill(PIN);
+      await top(page).getByRole('button', { name: 'Erase everything' }).click();
+      await page.getByRole('heading', { name: 'About you' }).waitFor({ timeout: 10000 });
+      const boot = await api(page, 'GET', '/api/bootstrap');
+      assert(boot.json.onboarded === false, 'after erasing, the app should be back at the first question');
+      const day = await api(page, 'GET', `/api/diary/${await page.evaluate(() => new Intl.DateTimeFormat('en-CA').format(new Date()))}`);
+      assert(day.json.entries.length === 0, 'the diary should be empty after erasing');
+      await shot('54-after-erase');
+
+      await page.setInputFiles('input[type=file]', file);
+      await page.getByRole('tab', { name: 'Diary' }).waitFor({ timeout: 15000 });
+      const after = await api(page, 'GET', '/api/export/json');
+      const differences = [];
+      for (const [table, rows] of Object.entries(before.json.tables)) {
+        if (JSON.stringify(after.json.tables[table]) !== JSON.stringify(rows)) differences.push(`${table} (${rows.length} rows before, ${after.json.tables[table]?.length} after)`);
+      }
+      assert(differences.length === 0, `these tables are different after restoring: ${differences.join(', ')}`);
+      const s = await summary(page);
+      assert(s.goal === goalBefore && near(s.food, foodBefore), `the diary should look the same again (goal ${goalBefore}, food ${foodBefore}), got ${s.label}`);
+      assert(countBefore.diary_entries > 10, 'the export should have had real data in it');
+    },
+    page,
+  );
+
+  // =========================================================================
   // 2. Unknown barcode, typed by hand (camera without a barcode in view)
   // =========================================================================
   console.log('\nBarcodes typed by hand');

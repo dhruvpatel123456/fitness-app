@@ -4,7 +4,15 @@
 
 It is a developer tool. It is **not** part of `npm test` (which needs no browser), and you do not need it to use the app.
 
-It passed 25 of 25 flows with no browser console errors when last run (Linux, Chromium).
+It passed 37 of 37 flows with no browser console errors when last run (Linux, Chromium). Besides the everyday flows above it also checks:
+
+- real touch swipes (change day, swipe-to-delete with Undo), not just mouse drags;
+- every screen at 390 px wide has no tap target under 44 px and nothing scrolls sideways (and nothing scrolls sideways at 320 px);
+- number fields ask for the numeric keypad;
+- a Saturday-only target applies on Saturdays only; exercise can be left out of the daily budget;
+- slow online food databases (own foods appear at once, a notice follows after about 5 seconds) and failing ones (a notice; foods and barcodes used before still work);
+- the phone's light/dark setting is followed by default;
+- export, erase everything through the screens, then restore from the file on the first screen: every table is identical afterwards.
 
 ## What it needs
 
@@ -44,6 +52,7 @@ node tests/e2e/phone-flows.cjs
 | `APP_URL` | Where the app is (default `http://localhost:3100`). `localhost` counts as a secure context, so the camera works. |
 | `LAN_URL` | Optional. The same app by its plain-http network address, to check the "camera hidden, no crash, typing a barcode still works" behaviour. |
 | `BARCODE_VIDEO` | Optional. Video for Chromium's fake camera. |
+| `MOCK_URL` | Optional. Control address of the stand-in food server (default `http://127.0.0.1:4010`). Without it the slow/failing-database flows are skipped. |
 | `SHOTS` | Folder for screenshots (default `tests/e2e/shots`, git-ignored if you add it). |
 
 The script prints one line per flow and a summary. It exits with a non-zero code if any flow fails or the browser console shows an error. A failed flow also saves `fail-….png` in the screenshots folder.

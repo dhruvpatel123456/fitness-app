@@ -468,7 +468,7 @@ export function AddFood({
               aria-selected={tab === t.key}
               onClick={() => setTab(t.key)}
               className={cx(
-                'min-h-10 shrink-0 rounded-full px-3.5 text-[14px] font-semibold',
+                'min-h-11 shrink-0 rounded-full px-3.5 text-[14px] font-semibold',
                 tab === t.key ? 'bg-primary text-primary-ink' : 'bg-surface text-muted',
               )}
             >

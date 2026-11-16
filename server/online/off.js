@@ -154,8 +154,9 @@ export async function offSearch(query, { config, fetchImpl, takeRequest = () => 
     return `${config.offBaseUrl}/cgi/search.pl?${params.toString()}`;
   };
 
-  const run = async (country) => {
-    const { data } = await fetchJson(build(country), { timeoutMs: config.onlineTimeoutMs, fetchImpl });
+  const startedAt = Date.now();
+  const run = async (country, timeoutMs = config.onlineTimeoutMs) => {
+    const { data } = await fetchJson(build(country), { timeoutMs, fetchImpl });
     const products = Array.isArray(data?.products) ? data.products : [];
     return products.map((p) => normaliseOffProduct(p)).filter((f) => f && f.source_id && f.kcal !== null);
   };
@@ -172,9 +173,13 @@ export async function offSearch(query, { config, fetchImpl, takeRequest = () => 
 
   if (config.offCountry) {
     add(await run(config.offCountry));
-    if (merged.length >= 6 || !takeRequest()) return merged;
+    if (merged.length >= 6) return merged;
+    // The whole search shares one time limit: the wider search only gets what is left of it, so a
+    // slow database can never keep the app waiting for twice the limit.
+    const left = config.onlineTimeoutMs - (Date.now() - startedAt);
+    if (left < Math.min(600, config.onlineTimeoutMs / 3) || !takeRequest()) return merged;
     try {
-      add(await run(''));
+      add(await run('', left));
     } catch {
       // The country results are still useful on their own.
     }
