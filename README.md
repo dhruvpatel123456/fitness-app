@@ -52,15 +52,15 @@ This guide assumes you have never done this before. Take it one section at a tim
 
 ## 2. Get the app and install it
 
-The code is on the `self-hosted` branch of the GitHub repository `dhruvpatel123456/fitness-app`.
+The code is in the GitHub repository `dhruvpatel123456/fitness-app` (the `main` branch).
 
 **Option A: download a zip (no extra software).**
-Open <https://github.com/dhruvpatel123456/fitness-app/tree/self-hosted>, click the green **Code** button, then **Download ZIP**. Unzip it somewhere permanent, for example `C:\Users\you\tucker-tally` on Windows or `~/tucker-tally` on macOS and Linux (not the Downloads folder, you will want to keep it).
+Open <https://github.com/dhruvpatel123456/fitness-app>, click the green **Code** button, then **Download ZIP**. Unzip it somewhere permanent, for example `C:\Users\you\tucker-tally` on Windows or `~/tucker-tally` on macOS and Linux (not the Downloads folder, you will want to keep it).
 
 **Option B: git.**
 
 ```bash
-git clone -b self-hosted https://github.com/dhruvpatel123456/fitness-app.git tucker-tally
+git clone https://github.com/dhruvpatel123456/fitness-app.git tucker-tally
 ```
 
 Then open a terminal **inside that folder** (the one that contains `package.json`):
